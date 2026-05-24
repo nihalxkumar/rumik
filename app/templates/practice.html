@@ -6,42 +6,80 @@
 {% block content %}
 <div class="container" style="padding-top: var(--space-4); padding-bottom: var(--space-6);">
 
-  {# --- Top bar: progress + grade/lang context ------------- #}
+  {# --- Top bar: progress + grade/lang context (fixed in v1) --- #}
   <div class="row-between" style="margin-bottom: var(--space-4);">
     <span class="pill pill--shadow">Grade 2</span>
     <span class="pill pill--shadow">Hinglish</span>
   </div>
-  {{ progress(progress_percent) }}
+  <div id="progress">{{ progress(progress_percent) }}</div>
 
-  {# --- Live recording status chip ------------------------- #}
+  {# --- Live status chip ---------------------------------------- #}
   <div style="display: flex; justify-content: center; margin-top: var(--space-4);">
-    {{ chip("Idle", live=False) }}
+    <span id="status-chip" class="chip">
+      <span class="chip__dot"></span>
+      <span data-status-label>Tap to answer</span>
+    </span>
   </div>
 
-  {# --- Question card -------------------------------------- #}
+  {# --- Question card ------------------------------------------- #}
   <div style="display: flex; justify-content: center; margin-top: var(--space-6);">
     {% call card("anim-pop-in") %}
-      <div class="t-display" style="text-align: center;">{{ question }}</div>
+      <div class="t-display" style="text-align: center;" data-question-prompt>
+        {{ question_prompt }}
+      </div>
       <p class="t-body" style="text-align: center; opacity: .7; margin-top: var(--space-2);">
         Question suno, phir jawab bolo.
       </p>
     {% endcall %}
   </div>
 
-  {# --- Mic CTA -------------------------------------------- #}
+  {# --- Mic CTA ------------------------------------------------- #}
   <div style="display: flex; justify-content: center; margin-top: var(--space-6);">
     {{ mic_button(state="idle", label="Tap to answer") }}
   </div>
 
-  {# --- Tutor feedback (hidden until response) ------------- #}
-  <div id="feedback" hidden style="display: flex; justify-content: center; margin-top: var(--space-6);">
-    {{ tutor_bubble("Sahi jawab!") }}
+  {# --- Typed-answer fallback ----------------------------------
+       Always visible in phase 2 so the whole loop is dogfoodable
+       without a microphone. Phase 3 will collapse it behind a
+       "type instead" toggle once mic input lands. -------------- #}
+  <form id="typed-answer-form" style="
+        display: flex; flex-direction: column; align-items: center;
+        gap: var(--space-2); margin-top: var(--space-6);">
+    <label class="t-label" for="typed-answer">Or type your answer</label>
+    <input id="typed-answer" name="typed_answer" inputmode="numeric"
+           autocomplete="off" autofocus
+           style="
+             font-family: var(--font-display);
+             font-size: var(--text-headline-md);
+             font-weight: 700;
+             text-align: center;
+             width: 8rem;
+             padding: var(--space-2);
+             border: 4px dashed var(--color-on-surface);
+             border-radius: var(--radius-lg);
+             background: var(--color-surface-container-lowest);
+             color: var(--color-on-surface);
+           " />
+    <button type="submit" class="btn btn--secondary">Check</button>
+  </form>
+
+  {# --- Tutor feedback (filled in by JS after each turn) ------- #}
+  <div id="feedback" hidden
+       style="display: flex; flex-direction: column; align-items: center;
+              gap: var(--space-2); margin-top: var(--space-6);">
+    <div class="bubble" data-tutor-bubble>—</div>
+    <p class="t-body" data-you-said style="opacity: .7;"></p>
+    <p class="t-label" data-streak style="opacity: .7;"></p>
   </div>
 </div>
+
+{# Seed the JS with the initial question id and deck size so it can
+   advance and update the progress pipe without a page reload. #}
+<script id="lesson-seed" type="application/json">
+  {"questionId": "{{ question_id }}", "deckTotal": {{ deck_total }} }
+</script>
 {% endblock %}
 
 {% block scripts %}
-{# Voice loop wiring added in Phase 3. Keeping the JS payload tiny matters
-   for first paint on cheap Android devices. #}
 <script defer src="{{ url_for('static', path='js/voice-loop.js') }}"></script>
 {% endblock %}
