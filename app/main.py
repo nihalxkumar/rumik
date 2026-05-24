@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import UploadFile
 
-from app import answer_parser, brain, lesson, stt, tutor_fallback, validator
+from app import answer_parser, brain, lesson, stt, tts, tutor_fallback, validator
 from app.schemas import NextQuestion, TurnRequest, TurnResponse
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -108,6 +108,15 @@ async def api_turn(request: Request) -> TurnResponse:
         parsed_was_none=parsed is None,
     )
 
+    # Synthesize tutor text to audio via Silk.
+    audio_base64 = None
+    tts_error = None
+    tts_result = await tts.synthesize(tutor_text)
+    if tts_result.error:
+        tts_error = tts_result.error
+    else:
+        audio_base64 = tts_result.audio_base64
+
     return TurnResponse(
         session_id=session.id,
         transcript=transcript,
@@ -118,13 +127,13 @@ async def api_turn(request: Request) -> TurnResponse:
         streak=result.streak,
         tutor_text=tutor_text,
         audio_url=None,
-        audio_base64=None,
+        audio_base64=audio_base64,
         next_question=(
             NextQuestion(id=result.next_question.id, prompt=result.next_question.prompt)
             if result.next_question
             else None
         ),
-        error=_turn_error(parsed=parsed, stt_error=stt_error),
+        error=_turn_error(parsed=parsed, stt_error=stt_error, tts_error=tts_error),
     )
 
 
@@ -162,10 +171,10 @@ def _required_form_str(value: object, field_name: str) -> str:
     return text
 
 
-def _turn_error(*, parsed: int | None, stt_error: str | None) -> str | None:
+def _turn_error(*, parsed: int | None, stt_error: str | None, tts_error: str | None = None) -> str | None:
     if parsed is not None:
-        return stt_error
-    return stt_error or "no_number_parsed"
+        return stt_error or tts_error
+    return stt_error or tts_error or "no_number_parsed"
 
 
 async def _tutor_line(context: brain.TutorContext, *, parsed_was_none: bool) -> str:

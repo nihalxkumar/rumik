@@ -1,11 +1,30 @@
 """End-to-end tests for /api/turn."""
+import base64
 import httpx
 import pytest
 
-from app import lesson
+from app import lesson, tts as tts_module
 from app import brain as brain_module
 from app import stt as stt_module
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def mock_silk_tts(monkeypatch):
+    """All tests get a mocked Silk TTS that returns fake audio.
+
+    Tests that specifically test Silk (like test_silk_*) can override this.
+    """
+    mock_audio = b"RIFF\x24\x00\x00\x00WAVE"
+    mock_result = tts_module.TTSResult(
+        audio_base64=base64.b64encode(mock_audio).decode("utf-8"),
+        error=None,
+    )
+
+    async def mock_synthesize(*args, **kwargs):
+        return mock_result
+
+    monkeypatch.setattr(tts_module, "synthesize", mock_synthesize)
 
 
 def reset_store():
@@ -228,3 +247,75 @@ async def test_multipart_audio_without_transcript_keeps_question(monkeypatch):
     assert data["attempt_count"] == 0
     assert data["next_question"]["id"] == qid
     assert data["error"] == "empty_transcript"
+
+
+@pytest.mark.asyncio
+async def test_silk_tts_returns_audio_base64(monkeypatch):
+    """Correct answer triggers Silk TTS synthesis and returns audio_base64."""
+    import base64
+    from unittest.mock import AsyncMock, patch
+
+    from app import tts as tts_module
+
+    qid = first_question_id()
+    expected = lesson.DECK[0].expected_answer
+
+    # Mock Silk to return fake audio
+    mock_audio = b"RIFF\x24\x00\x00\x00WAVE"
+    mock_tts_result = tts_module.TTSResult(
+        audio_base64=base64.b64encode(mock_audio).decode("utf-8"),
+        error=None,
+    )
+
+    async def mock_synthesize(*args, **kwargs):
+        return mock_tts_result
+
+    monkeypatch.setattr(tts_module, "synthesize", mock_synthesize)
+
+    async with fresh_client() as c:
+        r = await c.post("/api/turn", json={
+            "session_id": None,
+            "question_id": qid,
+            "typed_answer": str(expected),
+        })
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["is_correct"] is True
+    assert data["audio_base64"] is not None
+    assert data["audio_base64"] == base64.b64encode(mock_audio).decode("utf-8")
+    assert data["tutor_text"].startswith("[")
+
+
+@pytest.mark.asyncio
+async def test_silk_timeout_falls_back_to_text_only(monkeypatch):
+    """Silk timeout returns tutor_text without audio_base64."""
+    from app import tts as tts_module
+
+    qid = first_question_id()
+    expected = lesson.DECK[0].expected_answer
+
+    # Mock Silk to timeout
+    mock_tts_result = tts_module.TTSResult(
+        audio_base64=None,
+        error="tts_timeout",
+    )
+
+    async def mock_synthesize(*args, **kwargs):
+        return mock_tts_result
+
+    monkeypatch.setattr(tts_module, "synthesize", mock_synthesize)
+
+    async with fresh_client() as c:
+        r = await c.post("/api/turn", json={
+            "session_id": None,
+            "question_id": qid,
+            "typed_answer": str(expected),
+        })
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["is_correct"] is True
+    assert data["audio_base64"] is None
+    assert data["tutor_text"].startswith("[")
+    assert data["error"] == "tts_timeout"

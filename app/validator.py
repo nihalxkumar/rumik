@@ -9,9 +9,9 @@ Enforces the rules from the design doc:
 """
 import re
 
-ALLOWED_TAGS = {"[neutral]", "[happy]", "[whisper]", "[excited]", "[sad]"}
+ALLOWED_TAGS = {"[neutral]", "[happy]", "[whisper]", "[excited]", "[sad]", "[angry]"}
 
-_TAG_RE      = re.compile(r"^\[(neutral|happy|whisper|excited|sad)\]\s*")
+_TAG_RE      = re.compile(r"^\[(neutral|happy|whisper|excited|sad|angry)\]\s*")
 _OTHER_BRACK = re.compile(r"\[[^\]]+\]")
 _DEVANAGARI  = re.compile(r"[\u0900-\u097F]")
 _SENTENCE    = re.compile(r"[.!?]+")
