@@ -47,7 +47,7 @@
   function showFeedback({ tutor, said, streak, isCorrect }) {
     bubbleEl.textContent  = stripToneTag(tutor);
     youSaidEl.textContent = said ? `You said: ${said}` : "";
-    streakEl.textContent  = streak > 0 ? `${streak} correct in a row` : "";
+    streakEl.textContent  = streak > 0 ? `${toHindiNumeral(streak)} correct in a row` : "";
     feedback.hidden = false;
     feedback.classList.remove("anim-pop-in");
     void feedback.offsetWidth;            // restart animation
@@ -57,6 +57,12 @@
   function stripToneTag(s) {
     // The bubble shows the human-readable text; the tone tag is for Silk.
     return s.replace(/^\[(neutral|happy|whisper|excited|sad|angry)\]\s*/i, "");
+  }
+
+  function toHindiNumeral(num) {
+    if (num === null || num === undefined) return "";
+    const hindiDigits = ["०", "१", "२", "३", "४", "५", "६", "७", "८", "९"];
+    return String(num).split("").map((digit) => hindiDigits[parseInt(digit)] || digit).join("");
   }
 
   // ---------- Turn submission ----------

@@ -26,19 +26,20 @@ class Question:
 
 # Grade 1-3 add/sub deck. Keep it hand-authored — adaptive curriculum
 # is explicitly out of scope for v1.
+# Numbers use Hindi numerals for better readability for Indian children.
 DECK: list[Question] = [
-    Question("q01", "2 + 3 kitna hota hai?",   5),
-    Question("q02", "4 + 1 kitna hota hai?",   5),
-    Question("q03", "6 + 3 kitna hota hai?",   9),
-    Question("q04", "7 + 5 kitna hota hai?",  12),
-    Question("q05", "8 + 6 kitna hota hai?",  14),
-    Question("q06", "9 + 4 kitna hota hai?",  13),
-    Question("q07", "5 − 2 kitna hota hai?",   3),
-    Question("q08", "7 − 3 kitna hota hai?",   4),
-    Question("q09", "9 − 4 kitna hota hai?",   5),
-    Question("q10", "10 − 6 kitna hota hai?",  4),
-    Question("q11", "12 − 5 kitna hota hai?",  7),
-    Question("q12", "14 − 8 kitna hota hai?",  6),
+    Question("q01", "२ + ३ kitna hota hai?",   5),
+    Question("q02", "४ + १ kitna hota hai?",   5),
+    Question("q03", "६ + ३ kitna hota hai?",   9),
+    Question("q04", "७ + ५ kitna hota hai?",  12),
+    Question("q05", "८ + ६ kitna hota hai?",  14),
+    Question("q06", "९ + ४ kitna hota hai?",  13),
+    Question("q07", "५ − २ kitna hota hai?",   3),
+    Question("q08", "७ − ३ kitna hota hai?",   4),
+    Question("q09", "९ − ४ kitna hota hai?",   5),
+    Question("q10", "१० − ६ kitna hota hai?",  4),
+    Question("q11", "१२ − ५ kitna hota hai?",  7),
+    Question("q12", "१४ − ८ kitna hota hai?",  6),
 ]
 
 _BY_ID = {q.id: q for q in DECK}

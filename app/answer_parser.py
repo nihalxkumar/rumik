@@ -53,14 +53,16 @@ _ANSWER_CUES = {
     "matlab", "barabar", "result",
 }
 
-_TOKEN_RE = re.compile(r"[A-Za-z]+(?:-[A-Za-z]+)?|\d+")
+# Match English digits, Hindi numerals, and word tokens
+_TOKEN_RE = re.compile(r"[A-Za-z]+(?:-[A-Za-z]+)?|\d+|[०-९]+")
+_HINDI_TO_EN = {"०": "0", "१": "1", "२": "2", "३": "3", "४": "4", "५": "5", "६": "6", "७": "7", "८": "8", "९": "9"}
 
 
 def parse(text: str) -> int | None:
     """Return the parsed numeric answer, or None if we should ask again.
 
     Heuristic:
-      1. Tokenize and convert each token to int if possible (digits or word).
+      1. Tokenize and convert each token to int if possible (digits, Hindi numerals, or word).
       2. If exactly one number is found, return it.
       3. If multiple are found and a cue word ("answer", "jawab", ...)
          appears, return the number nearest (after) the last cue.
@@ -76,6 +78,10 @@ def parse(text: str) -> int | None:
     for i, tok in enumerate(tokens):
         if tok.isdigit():
             numbers.append((i, int(tok)))
+        elif all(c in _HINDI_TO_EN for c in tok):
+            # Convert Hindi numerals to English and parse
+            en_digits = "".join(_HINDI_TO_EN[c] for c in tok)
+            numbers.append((i, int(en_digits)))
         elif tok in _WORD_LOOKUP:
             numbers.append((i, _WORD_LOOKUP[tok]))
         elif tok in _ANSWER_CUES:
