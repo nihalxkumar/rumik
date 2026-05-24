@@ -57,7 +57,18 @@ async def synthesize(text: str, speaker: str = "speaker_1") -> TTSResult:
 
             # Response is binary WAV audio
             audio_bytes = response.content
+            # Debug: log response info
+            print(f"[TTS] Silk response status: {response.status_code}")
+            print(f"[TTS] Audio bytes received: {len(audio_bytes)} bytes")
+            print(f"[TTS] Content-Type: {response.headers.get('content-type')}")
+
             audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+            print(f"[TTS] Base64 length: {len(audio_base64)}")
+
+            if not audio_base64:
+                print(f"[TTS] WARNING: Empty audio returned")
+                return TTSResult(audio_base64=None, error="tts_empty_response")
+
             return TTSResult(audio_base64=audio_base64, error=None)
 
     except httpx.TimeoutException:
