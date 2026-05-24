@@ -2,8 +2,8 @@
 Rumik FastAPI entrypoint.
 
 Owns wiring only: static files, templates, routes. Real logic lives
-in lesson.py / answer_parser.py / validator.py and (later) stt.py,
-brain.py, tts.py.
+in lesson.py / answer_parser.py / validator.py / stt.py / brain.py
+and (later) tts.py.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import UploadFile
 
-from app import answer_parser, lesson, stt, tutor_fallback, validator
+from app import answer_parser, brain, lesson, stt, tutor_fallback, validator
 from app.schemas import NextQuestion, TurnRequest, TurnResponse
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -91,7 +91,22 @@ async def api_turn(request: Request) -> TurnResponse:
     parsed = answer_parser.parse(transcript or "")
     result = lesson.store.record_attempt(session, parsed)
 
-    tutor_text = _tutor_line(result.is_correct, parsed_was_none=parsed is None)
+    question = lesson.get_question(payload.question_id)
+    if question is None:
+        raise HTTPException(status_code=409, detail=f"unknown question_id {payload.question_id}")
+
+    tutor_text = await _tutor_line(
+        brain.TutorContext(
+            question=question,
+            transcript=transcript,
+            parsed_answer=parsed,
+            expected_answer=result.expected_answer,
+            is_correct=result.is_correct,
+            streak=result.streak,
+            attempt_count=result.attempt_count,
+        ),
+        parsed_was_none=parsed is None,
+    )
 
     return TurnResponse(
         session_id=session.id,
@@ -153,12 +168,11 @@ def _turn_error(*, parsed: int | None, stt_error: str | None) -> str | None:
     return stt_error or "no_number_parsed"
 
 
-def _tutor_line(is_correct: bool, *, parsed_was_none: bool) -> str:
-    """Pick a local tutor line and confirm it passes the Silk validator.
+async def _tutor_line(context: brain.TutorContext, *, parsed_was_none: bool) -> str:
+    """Get a Gemini tutor line, falling back to local validated strings.
 
-    Doing this here — even with hand-authored strings — means phase 4's
-    Gemini wiring inherits a code path that already validates before
-    returning. The strings are also guaranteed Silk-safe by tests.
+    The response must always pass the Silk validator before returning.
     """
-    line = tutor_fallback.pick(is_correct, parsed_was_none)
+    generated = await brain.generate_tutor_line(context)
+    line = generated.text or tutor_fallback.pick(context.is_correct, parsed_was_none)
     return validator.validate(line)

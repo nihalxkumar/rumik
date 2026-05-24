@@ -3,6 +3,7 @@ import httpx
 import pytest
 
 from app import lesson
+from app import brain as brain_module
 from app import stt as stt_module
 from app.main import app
 
@@ -44,6 +45,51 @@ async def test_correct_typed_answer_advances():
     assert data["next_question"]["id"] == lesson.DECK[1].id
     assert data["tutor_text"].startswith("[")
     assert data["session_id"]
+
+
+@pytest.mark.asyncio
+async def test_gemini_tutor_line_is_used(monkeypatch):
+    qid = first_question_id()
+
+    async def fake_generate(context: brain_module.TutorContext):
+        assert context.question.id == qid
+        assert context.parsed_answer == 5
+        assert context.is_correct is True
+        return brain_module.BrainResult(text="[happy] Gemini says sahi jawab!")
+
+    monkeypatch.setattr("app.main.brain.generate_tutor_line", fake_generate)
+
+    async with fresh_client() as c:
+        r = await c.post("/api/turn", json={
+            "session_id": None,
+            "question_id": qid,
+            "typed_answer": "5",
+        })
+
+    data = r.json()
+    assert data["tutor_text"] == "[happy] Gemini says sahi jawab!"
+
+
+@pytest.mark.asyncio
+async def test_invalid_gemini_tutor_line_falls_back(monkeypatch):
+    qid = first_question_id()
+
+    async def fake_generate(context: brain_module.TutorContext):
+        return brain_module.BrainResult(text=None, error="brain_invalid")
+
+    monkeypatch.setattr("app.main.brain.generate_tutor_line", fake_generate)
+
+    async with fresh_client() as c:
+        r = await c.post("/api/turn", json={
+            "session_id": None,
+            "question_id": qid,
+            "typed_answer": "5",
+        })
+
+    data = r.json()
+    assert data["tutor_text"].startswith("[")
+    assert data["tutor_text"] != "[happy] Gemini says sahi jawab!"
+    assert data["error"] is None
 
 
 @pytest.mark.asyncio

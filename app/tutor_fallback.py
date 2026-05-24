@@ -1,10 +1,9 @@
 """
-Local tutor lines used until Gemini lands in phase 4.
+Local tutor lines used when Gemini is unavailable or invalid.
 
 Every line is hand-validated against `validator.py` (one leading
-tone tag, 1–3 sentences, Roman script). When Gemini is wired up,
-these become the fallback for when the AI call fails or its output
-fails validation twice — so we never let the demo go silent.
+tone tag, 1–3 sentences, Roman script). This keeps the demo from going
+silent when the AI call fails or its output fails validation twice.
 """
 from __future__ import annotations
 

@@ -26,7 +26,8 @@ uvicorn app.main:app --reload --port 8000
 
 Open <http://localhost:8000>. Mic access needs HTTPS on a real phone —
 use Cloudflare Tunnel / ngrok for device testing. Voice input uses
-`DEEPGRAM_API_KEY`; typed answers still work without it.
+`DEEPGRAM_API_KEY`; AI tutor lines use `GEMINI_API_KEY`; local fallbacks keep
+typed answers working without either key.
 
 ## Layout
 
