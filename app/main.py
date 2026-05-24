@@ -13,8 +13,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.datastructures import UploadFile
 
-from app import answer_parser, lesson, tutor_fallback, validator
+from app import answer_parser, lesson, stt, tutor_fallback, validator
 from app.schemas import NextQuestion, TurnRequest, TurnResponse
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -61,16 +62,24 @@ async def healthz() -> dict[str, str]:
 # ---------- API ----------------------------------------------------
 
 @app.post("/api/turn", response_model=TurnResponse)
-async def api_turn(payload: TurnRequest) -> TurnResponse:
+async def api_turn(request: Request) -> TurnResponse:
     """One full lesson turn: score the answer, pick the next question,
     return the tutor line.
 
-    Phase 2 supports the typed-answer path only. Phase 3 will accept
-    multipart audio uploads on the same endpoint and run them through
-    Deepgram before calling into the lesson engine.
+    Accepts both the Phase 2 JSON typed-answer path and the Phase 3
+    multipart audio path. Both converge into a transcript string before
+    deterministic parsing and scoring.
     """
-    session = lesson.store.get_or_create(payload.session_id)
+    payload, audio, audio_content_type = await _read_turn_request(request)
 
+    transcript = payload.typed_answer
+    stt_error: str | None = None
+    if audio is not None:
+        stt_result = await stt.transcribe(audio, content_type=audio_content_type)
+        transcript = stt_result.transcript or payload.typed_answer
+        stt_error = stt_result.error
+
+    session = lesson.store.get_or_create(payload.session_id)
     # Reject question_id mismatches loudly — they signal a stale tab,
     # which is better surfaced than silently re-scoring the wrong question.
     if payload.question_id != session.current_question_id:
@@ -79,14 +88,14 @@ async def api_turn(payload: TurnRequest) -> TurnResponse:
             detail=f"stale question_id {payload.question_id}; expected {session.current_question_id}",
         )
 
-    parsed = answer_parser.parse(payload.typed_answer or "")
+    parsed = answer_parser.parse(transcript or "")
     result = lesson.store.record_attempt(session, parsed)
 
     tutor_text = _tutor_line(result.is_correct, parsed_was_none=parsed is None)
 
     return TurnResponse(
         session_id=session.id,
-        transcript=payload.typed_answer,
+        transcript=transcript,
         parsed_answer=parsed,
         expected_answer=result.expected_answer,
         is_correct=result.is_correct,
@@ -100,8 +109,48 @@ async def api_turn(payload: TurnRequest) -> TurnResponse:
             if result.next_question
             else None
         ),
-        error=None if parsed is not None else "no_number_parsed",
+        error=_turn_error(parsed=parsed, stt_error=stt_error),
     )
+
+
+async def _read_turn_request(request: Request) -> tuple[TurnRequest, bytes | None, str | None]:
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        upload = form.get("audio")
+        audio: bytes | None = None
+        audio_content_type: str | None = None
+        if isinstance(upload, UploadFile):
+            audio = await upload.read()
+            audio_content_type = upload.content_type
+        payload = TurnRequest(
+            session_id=_form_str(form.get("session_id")),
+            question_id=_required_form_str(form.get("question_id"), "question_id"),
+            typed_answer=_form_str(form.get("typed_answer")),
+        )
+        return payload, audio, audio_content_type
+
+    body = await request.json()
+    return TurnRequest.model_validate(body), None, None
+
+
+def _form_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _required_form_str(value: object, field_name: str) -> str:
+    text = _form_str(value)
+    if not text:
+        raise HTTPException(status_code=422, detail=f"missing {field_name}")
+    return text
+
+
+def _turn_error(*, parsed: int | None, stt_error: str | None) -> str | None:
+    if parsed is not None:
+        return stt_error
+    return stt_error or "no_number_parsed"
 
 
 def _tutor_line(is_correct: bool, *, parsed_was_none: bool) -> str:

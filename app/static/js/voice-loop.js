@@ -1,9 +1,5 @@
 // Voice / answer loop for the practice screen.
 //
-// Phase 2 (current): typed answers only. POST { session_id, question_id,
-// typed_answer } to /api/turn, render the tutor response, advance.
-// Phase 3 will add MediaRecorder + multipart upload on the same endpoint.
-//
 // Keep dependency-free and small — slow Android phones are the target.
 
 (() => {
@@ -20,6 +16,9 @@
     questionId: seed.questionId,
     deckTotal: seed.deckTotal,
     completed: 0,
+    recorder: null,
+    chunks: [],
+    busy: false,
   };
 
   // ---------- DOM handles ----------
@@ -37,6 +36,10 @@
   // ---------- UI helpers ----------
   function setStatus(text) { if (statusLbl) statusLbl.textContent = text; }
   function setMic(s)       { if (mic) mic.dataset.state = s; }
+  function setBusy(v) {
+    state.busy = v;
+    if (input) input.disabled = v;
+  }
   function renderProgress(done) {
     if (!progressEl) return;
     progressEl.style.width = `${Math.min(100, (done / state.deckTotal) * 100)}%`;
@@ -58,8 +61,10 @@
 
   // ---------- Turn submission ----------
   async function submitTypedAnswer(typed) {
+    if (state.busy) return;
     setStatus("Check kar raha hoon…");
     setMic("thinking");
+    setBusy(true);
 
     let res;
     try {
@@ -75,18 +80,59 @@
     } catch (err) {
       setStatus("Network error — try again");
       setMic("idle");
+      setBusy(false);
       return;
     }
 
     if (!res.ok) {
       setStatus(`Error ${res.status}`);
       setMic("idle");
+      setBusy(false);
       return;
     }
 
+    await handleTurnResponse(res);
+  }
+
+  async function submitAudio(blob) {
+    if (state.busy) return;
+    setStatus("Sun raha hoon…");
+    setMic("uploading");
+    setBusy(true);
+
+    const body = new FormData();
+    const sid = sessionId();
+    if (sid) body.append("session_id", sid);
+    body.append("question_id", state.questionId);
+    body.append("audio", blob, "answer.webm");
+
+    let res;
+    try {
+      res = await fetch("/api/turn", { method: "POST", body });
+    } catch (err) {
+      setStatus("Network error — type instead");
+      setMic("idle");
+      setBusy(false);
+      input?.focus();
+      return;
+    }
+
+    if (!res.ok) {
+      setStatus(`Error ${res.status} — type instead`);
+      setMic("idle");
+      setBusy(false);
+      input?.focus();
+      return;
+    }
+
+    await handleTurnResponse(res);
+  }
+
+  async function handleTurnResponse(res) {
+    setStatus("Soch raha hoon…");
+    setMic("thinking");
     const data = await res.json();
     rememberSession(data.session_id);
-
     showFeedback({
       tutor: data.tutor_text,
       said:  data.transcript ?? "",
@@ -99,11 +145,11 @@
       renderProgress(state.completed);
     }
 
+    const lessonDone = !data.next_question;
     if (data.next_question) {
       state.questionId = data.next_question.id;
       promptEl.textContent = data.next_question.prompt;
       input.value = "";
-      input.focus();
     } else {
       // Deck finished — phase 6 will route to /summary.
       setStatus("All done!");
@@ -111,6 +157,8 @@
     }
 
     setMic("idle");
+    if (!lessonDone) setBusy(false);
+    if (data.error) setStatus(data.error === "no_number_parsed" ? "Please repeat or type" : "Type instead");
   }
 
   // ---------- Wire up inputs ----------
@@ -121,10 +169,50 @@
     submitTypedAnswer(value);
   });
 
-  mic?.addEventListener("click", () => {
-    // Phase 3 wires the real recorder here. For now nudge the user
-    // toward the typed-answer path so the loop is still usable.
-    setStatus("Type your answer for now");
-    input.focus();
+  mic?.addEventListener("click", async () => {
+    if (state.busy) return;
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setStatus("Mic not supported — type instead");
+      input?.focus();
+      return;
+    }
+
+    if (state.recorder?.state === "recording") {
+      state.recorder.stop();
+      setStatus("Upload kar raha hoon…");
+      setMic("uploading");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = pickMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      state.recorder = recorder;
+      state.chunks = [];
+
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size > 0) state.chunks.push(event.data);
+      });
+      recorder.addEventListener("stop", () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const blob = new Blob(state.chunks, { type: recorder.mimeType || "audio/webm" });
+        state.recorder = null;
+        submitAudio(blob);
+      });
+
+      recorder.start();
+      setStatus("Bol ke dobara tap karo");
+      setMic("recording");
+    } catch (err) {
+      setStatus("Mic denied — type instead");
+      setMic("idle");
+      input?.focus();
+    }
   });
+
+  function pickMimeType() {
+    const preferred = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    return preferred.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+  }
 })();

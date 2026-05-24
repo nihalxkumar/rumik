@@ -3,8 +3,8 @@ Public /api/turn request + response contract.
 
 Locked early so the frontend, the lesson engine, the Gemini path
 (phase 4), and the Silk path (phase 5) all target the same shape.
-Optional fields will be filled in by later phases — for now
-`transcript` echoes the typed answer and `audio_url` stays null.
+Optional fields will be filled in by later phases. In Phase 3,
+`transcript` is either the typed answer or the Deepgram transcript.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ class TurnRequest(BaseModel):
     session_id: str | None = None
     question_id: str
     typed_answer: str | None = None
-    # Phase 3 will add `audio: UploadFile` via multipart instead of JSON.
+    # Multipart requests carry the audio UploadFile outside this JSON schema.
 
 
 class NextQuestion(BaseModel):

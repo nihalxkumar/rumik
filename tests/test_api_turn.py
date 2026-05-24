@@ -1,30 +1,40 @@
-"""End-to-end tests for /api/turn (typed-answer path, phase 2)."""
-from fastapi.testclient import TestClient
+"""End-to-end tests for /api/turn."""
+import httpx
+import pytest
 
 from app import lesson
+from app import stt as stt_module
 from app.main import app
 
 
-def fresh_client():
+def reset_store():
     # Each test gets its own session store so streaks don't leak.
     lesson.store = lesson.SessionStore()
-    return TestClient(app)
+
+
+def fresh_client():
+    reset_store()
+    return httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+    )
 
 
 def first_question_id() -> str:
     return lesson.DECK[0].id
 
 
-def test_correct_typed_answer_advances():
-    c = fresh_client()
+@pytest.mark.asyncio
+async def test_correct_typed_answer_advances():
     qid = first_question_id()
     expected = lesson.DECK[0].expected_answer
 
-    r = c.post("/api/turn", json={
-        "session_id": None,
-        "question_id": qid,
-        "typed_answer": str(expected),
-    })
+    async with fresh_client() as c:
+        r = await c.post("/api/turn", json={
+            "session_id": None,
+            "question_id": qid,
+            "typed_answer": str(expected),
+        })
 
     assert r.status_code == 200
     data = r.json()
@@ -36,16 +46,17 @@ def test_correct_typed_answer_advances():
     assert data["session_id"]
 
 
-def test_wrong_typed_answer_keeps_question():
-    c = fresh_client()
+@pytest.mark.asyncio
+async def test_wrong_typed_answer_keeps_question():
     qid = first_question_id()
     wrong = lesson.DECK[0].expected_answer + 7
 
-    r = c.post("/api/turn", json={
-        "session_id": None,
-        "question_id": qid,
-        "typed_answer": str(wrong),
-    })
+    async with fresh_client() as c:
+        r = await c.post("/api/turn", json={
+            "session_id": None,
+            "question_id": qid,
+            "typed_answer": str(wrong),
+        })
 
     data = r.json()
     assert data["is_correct"] is False
@@ -53,15 +64,16 @@ def test_wrong_typed_answer_keeps_question():
     assert data["next_question"]["id"] == qid
 
 
-def test_unparseable_answer_returns_error_field():
-    c = fresh_client()
+@pytest.mark.asyncio
+async def test_unparseable_answer_returns_error_field():
     qid = first_question_id()
 
-    r = c.post("/api/turn", json={
-        "session_id": None,
-        "question_id": qid,
-        "typed_answer": "I dunno",
-    })
+    async with fresh_client() as c:
+        r = await c.post("/api/turn", json={
+            "session_id": None,
+            "question_id": qid,
+            "typed_answer": "I dunno",
+        })
 
     data = r.json()
     assert data["error"] == "no_number_parsed"
@@ -70,24 +82,103 @@ def test_unparseable_answer_returns_error_field():
     assert data["next_question"]["id"] == qid
 
 
-def test_stale_question_id_returns_409():
-    c = fresh_client()
+@pytest.mark.asyncio
+async def test_stale_question_id_returns_409():
     qid = first_question_id()
 
     # First turn: get back the assigned session_id and advance past q1.
-    r = c.post("/api/turn", json={
-        "session_id": None,
-        "question_id": qid,
-        "typed_answer": str(lesson.DECK[0].expected_answer),
-    })
-    assert r.status_code == 200
-    sid = r.json()["session_id"]
+    async with fresh_client() as c:
+        r = await c.post("/api/turn", json={
+            "session_id": None,
+            "question_id": qid,
+            "typed_answer": str(lesson.DECK[0].expected_answer),
+        })
+        assert r.status_code == 200
+        sid = r.json()["session_id"]
 
-    # Posting the now-completed question_id should 409 — that means a
-    # stale browser tab, which we'd rather surface than silently re-score.
-    stale = c.post("/api/turn", json={
-        "session_id": sid,
-        "question_id": qid,
-        "typed_answer": "1",
-    })
+        # Posting the now-completed question_id should 409 — that means a
+        # stale browser tab, which we'd rather surface than silently re-score.
+        stale = await c.post("/api/turn", json={
+            "session_id": sid,
+            "question_id": qid,
+            "typed_answer": "1",
+        })
+
+    assert r.status_code == 200
     assert stale.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_multipart_audio_answer_advances(monkeypatch):
+    qid = first_question_id()
+
+    async def fake_transcribe(audio: bytes, *, content_type: str | None):
+        assert audio == b"fake-webm"
+        assert content_type == "audio/webm"
+        return stt_module.STTResult(transcript="panch")
+
+    monkeypatch.setattr("app.main.stt.transcribe", fake_transcribe)
+
+    async with fresh_client() as c:
+        r = await c.post(
+            "/api/turn",
+            data={"question_id": qid},
+            files={"audio": ("answer.webm", b"fake-webm", "audio/webm")},
+        )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["transcript"] == "panch"
+    assert data["parsed_answer"] == 5
+    assert data["is_correct"] is True
+    assert data["next_question"]["id"] == lesson.DECK[1].id
+    assert data["error"] is None
+
+
+@pytest.mark.asyncio
+async def test_multipart_stt_failure_falls_back_to_typed_answer(monkeypatch):
+    qid = first_question_id()
+
+    async def fake_transcribe(audio: bytes, *, content_type: str | None):
+        return stt_module.STTResult(transcript=None, error="stt_timeout")
+
+    monkeypatch.setattr("app.main.stt.transcribe", fake_transcribe)
+
+    async with fresh_client() as c:
+        r = await c.post(
+            "/api/turn",
+            data={"question_id": qid, "typed_answer": "5"},
+            files={"audio": ("answer.webm", b"fake-webm", "audio/webm")},
+        )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["transcript"] == "5"
+    assert data["parsed_answer"] == 5
+    assert data["is_correct"] is True
+    assert data["error"] == "stt_timeout"
+
+
+@pytest.mark.asyncio
+async def test_multipart_audio_without_transcript_keeps_question(monkeypatch):
+    qid = first_question_id()
+
+    async def fake_transcribe(audio: bytes, *, content_type: str | None):
+        return stt_module.STTResult(transcript=None, error="empty_transcript")
+
+    monkeypatch.setattr("app.main.stt.transcribe", fake_transcribe)
+
+    async with fresh_client() as c:
+        r = await c.post(
+            "/api/turn",
+            data={"question_id": qid},
+            files={"audio": ("answer.webm", b"fake-webm", "audio/webm")},
+        )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["transcript"] is None
+    assert data["parsed_answer"] is None
+    assert data["attempt_count"] == 0
+    assert data["next_question"]["id"] == qid
+    assert data["error"] == "empty_transcript"
