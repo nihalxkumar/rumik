@@ -56,7 +56,7 @@
   }
   function stripToneTag(s) {
     // The bubble shows the human-readable text; the tone tag is for Silk.
-    return s.replace(/^\[(neutral|happy|whisper|excited|sad)\]\s*/i, "");
+    return s.replace(/^\[(neutral|happy|whisper|excited|sad|angry)\]\s*/i, "");
   }
 
   // ---------- Turn submission ----------
@@ -140,6 +140,11 @@
       isCorrect: data.is_correct,
     });
 
+    // Play Silk audio if available
+    if (data.audio_base64) {
+      playAudio(data.audio_base64);
+    }
+
     if (data.is_correct) {
       state.completed += 1;
       renderProgress(state.completed);
@@ -159,6 +164,28 @@
     setMic("idle");
     if (!lessonDone) setBusy(false);
     if (data.error) setStatus(data.error === "no_number_parsed" ? "Please repeat or type" : "Type instead");
+  }
+
+  function playAudio(base64Audio) {
+    try {
+      const binary = atob(base64Audio);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: "audio/wav" });
+      const url = URL.createObjectURL(blob);
+
+      const audio = new Audio();
+      audio.src = url;
+      audio.play().catch((err) => {
+        console.log("Autoplay blocked or audio failed:", err.message);
+        setStatus("Play tutor voice");
+      });
+    } catch (err) {
+      console.error("Audio playback error:", err);
+      setStatus("Audio failed — text shown");
+    }
   }
 
   // ---------- Wire up inputs ----------
