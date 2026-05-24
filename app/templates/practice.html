@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "partials/_components.html" import button, card, mic_button, progress, chip, tutor_bubble %}
+
+{% block title %}Rumik — Practice{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--space-4); padding-bottom: var(--space-6);">
+
+  {# --- Top bar: progress + grade/lang context ------------- #}
+  <div class="row-between" style="margin-bottom: var(--space-4);">
+    <span class="pill pill--shadow">Grade 2</span>
+    <span class="pill pill--shadow">Hinglish</span>
+  </div>
+  {{ progress(progress_percent) }}
+
+  {# --- Live recording status chip ------------------------- #}
+  <div style="display: flex; justify-content: center; margin-top: var(--space-4);">
+    {{ chip("Idle", live=False) }}
+  </div>
+
+  {# --- Question card -------------------------------------- #}
+  <div style="display: flex; justify-content: center; margin-top: var(--space-6);">
+    {% call card("anim-pop-in") %}
+      <div class="t-display" style="text-align: center;">{{ question }}</div>
+      <p class="t-body" style="text-align: center; opacity: .7; margin-top: var(--space-2);">
+        Question suno, phir jawab bolo.
+      </p>
+    {% endcall %}
+  </div>
+
+  {# --- Mic CTA -------------------------------------------- #}
+  <div style="display: flex; justify-content: center; margin-top: var(--space-6);">
+    {{ mic_button(state="idle", label="Tap to answer") }}
+  </div>
+
+  {# --- Tutor feedback (hidden until response) ------------- #}
+  <div id="feedback" hidden style="display: flex; justify-content: center; margin-top: var(--space-6);">
+    {{ tutor_bubble("Sahi jawab!") }}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{# Voice loop wiring added in Phase 3. Keeping the JS payload tiny matters
+   for first paint on cheap Android devices. #}
+<script defer src="{{ url_for('static', path='js/voice-loop.js') }}"></script>
+{% endblock %}

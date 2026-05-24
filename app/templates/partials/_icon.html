@@ -1,0 +1,21 @@
+{# ----------------------------------------------------------------
+   Icon macro — single source of truth for icon rendering.
+
+   Usage:
+     {% from "partials/_icon.html" import icon %}
+     {{ icon("mic", size=64, fill=True) }}
+
+   Backed by the subsetted Material Symbols font loaded once in base.html.
+   To add a new icon, update the icon_names= list in base.html too.
+---------------------------------------------------------------- #}
+{% macro icon(name, size=24, fill=False, class="") -%}
+<span
+  class="material-symbols-outlined {{ class }}"
+  style="
+    font-size: {{ size }}px;
+    line-height: 1;
+    font-variation-settings: 'FILL' {{ 1 if fill else 0 }};
+  "
+  aria-hidden="true"
+>{{ name }}</span>
+{%- endmacro %}

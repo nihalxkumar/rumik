@@ -1,0 +1,110 @@
+/* ----------------------------------------------------------------
+   Design tokens — Vibrant Wonder Blocks
+   Single source of truth for colors, spacing, type, motion, depth.
+   Pulled from DESIGN.md. Do not redefine these inline in templates.
+   ---------------------------------------------------------------- */
+
+:root {
+  /* ----- Surfaces & ink ---------------------------------------- */
+  --color-surface:                 #f4faff;
+  --color-surface-dim:             #b5e0f6;
+  --color-surface-bright:          #f4faff;
+  --color-surface-container-lowest:#ffffff;
+  --color-surface-container-low:   #e6f6ff;
+  --color-surface-container:       #d9f2ff;
+  --color-surface-container-high:  #cbedff;
+  --color-surface-container-highest:#bde9ff;
+  --color-on-surface:              #001f2a; /* Deep Navy — the "ink" */
+  --color-on-surface-variant:      #4e4636;
+  --color-inverse-surface:         #003546;
+  --color-inverse-on-surface:      #e0f4ff;
+  --color-outline:                 #807664;
+  --color-outline-variant:         #d1c5b1;
+  --color-background:              #fffdd0; /* Creamy Vanilla canvas */
+
+  /* ----- Primary / secondary / tertiary ------------------------ */
+  --color-primary:                 #785a00;
+  --color-on-primary:              #ffffff;
+  --color-primary-container:       #ffd166; /* Sunflower Yellow */
+  --color-on-primary-container:    #765900;
+  --color-primary-fixed:           #ffdf9b;
+  --color-primary-fixed-dim:       #edc157;
+
+  --color-secondary:               #7726e0; /* Soft Purple */
+  --color-on-secondary:            #ffffff;
+  --color-secondary-container:     #9149fa;
+  --color-on-secondary-container:  #fffbff;
+  --color-secondary-fixed:         #ecdcff;
+  --color-secondary-fixed-dim:     #d5baff;
+  --color-on-secondary-fixed:      #270057;
+
+  --color-tertiary:                #006c4f; /* Mint Green family */
+  --color-on-tertiary:             #ffffff;
+  --color-tertiary-container:      #44f1b9;
+  --color-tertiary-fixed:          #54fdc4;
+  --color-tertiary-fixed-dim:      #27e0a9;
+
+  --color-error:                   #ba1a1a;
+  --color-on-error:                #ffffff;
+  --color-error-container:         #ffdad6;
+
+  /* Block accent fills used on the home grid */
+  --color-block-coral:             #ff9b9b;
+  --color-block-sky:               #9bdeff;
+  --color-block-flame:             #ff6b6b;
+
+  /* ----- Spacing (8px base) ------------------------------------ */
+  --space-1: 8px;
+  --space-2: 16px;  /* stack-sm */
+  --space-3: 24px;  /* gutter */
+  --space-4: 32px;  /* stack-md */
+  --space-6: 48px;  /* stack-lg */
+  --space-8: 64px;  /* margin-desktop */
+
+  /* ----- Radii ------------------------------------------------- */
+  --radius-sm:   4px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;  /* Wonder Block cards */
+  --radius-2xl:  32px;
+  --radius-pill: 9999px;
+
+  /* ----- Borders & depth (Hard Extrusions) --------------------- */
+  --ink: var(--color-on-surface);
+  --border-thin:  2px solid var(--ink);
+  --border-chunk: 4px solid var(--ink);
+  --border-thick: 6px solid var(--ink);
+
+  /* Six-pixel offset hard shadow — the signature "block" feel */
+  --shadow-pop-sm: 0 2px 0 0 var(--ink);
+  --shadow-pop:    0 4px 0 0 var(--ink);
+  --shadow-pop-md: 0 6px 0 0 var(--ink);
+  --shadow-pop-lg: 0 8px 0 0 var(--ink);
+  --shadow-pop-xl: 0 12px 0 0 var(--ink);
+
+  /* ----- Type -------------------------------------------------- */
+  --font-display:  "Rubik", system-ui, sans-serif;
+  --font-body:     "Quicksand", system-ui, sans-serif;
+
+  --text-display-lg:  56px;
+  --text-headline-lg: 40px;
+  --text-headline-md: 32px;
+  --text-body-lg:     24px;
+  --text-body-md:     20px;
+  --text-label-lg:    18px;
+  --text-button:      22px;
+
+  /* ----- Motion ------------------------------------------------ */
+  --ease-pop: cubic-bezier(.34,1.56,.64,1);
+  --dur-fast: 120ms;
+  --dur-med:  240ms;
+}
+
+/* Honor user reduced-motion preference — important for kids prone
+   to motion sensitivity. All animation utilities should respect this. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-med:  0ms;
+  }
+}

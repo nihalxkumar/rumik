@@ -1,0 +1,68 @@
+{# ----------------------------------------------------------------
+   Component macros — shared Wonder Block UI pieces.
+
+   Usage:
+     {% from "partials/_components.html" import button, card, pill,
+        tutor_bubble, mic_button, progress, chip %}
+
+   These macros wrap the CSS classes from components.css so screens
+   never duplicate the chunky-shadow / border / radius patterns.
+---------------------------------------------------------------- #}
+{% from "partials/_icon.html" import icon %}
+
+{# ---------- Button ------------------------------------------- #}
+{% macro button(label, variant="primary", size="md", type="button", icon_name=None, attrs="") -%}
+  {%- set v = {"primary":"", "secondary":"btn--secondary", "tertiary":"btn--tertiary", "ghost":"btn--ghost"}[variant] -%}
+  {%- set s = "btn--giant" if size == "giant" else "" -%}
+  <button type="{{ type }}" class="btn {{ v }} {{ s }}" {{ attrs|safe }}>
+    {% if icon_name %}{{ icon(icon_name, size=24, fill=True) }}{% endif %}
+    <span>{{ label }}</span>
+  </button>
+{%- endmacro %}
+
+{# ---------- Card (Wonder Block container) -------------------- #}
+{% macro card(class="") -%}
+  <div class="card {{ class }}">
+    {{ caller() }}
+  </div>
+{%- endmacro %}
+
+{# ---------- Stat pill (star count, streak, etc.) ------------- #}
+{% macro pill(value, icon_name=None, icon_color=None, shadow=True) -%}
+  <span class="pill {{ 'pill--shadow' if shadow else '' }}">
+    {% if icon_name %}
+      <span style="color: {{ icon_color or 'var(--color-primary-container)' }}">
+        {{ icon(icon_name, size=24, fill=True) }}
+      </span>
+    {% endif %}
+    <span>{{ value }}</span>
+  </span>
+{%- endmacro %}
+
+{# ---------- Tutor speech bubble ------------------------------ #}
+{% macro tutor_bubble(text) -%}
+  <div class="bubble">{{ text }}</div>
+{%- endmacro %}
+
+{# ---------- Big mic button ----------------------------------- #}
+{% macro mic_button(state="idle", label="Tap to answer") -%}
+  {# state: idle | recording | uploading | thinking | speaking | complete #}
+  <button class="mic" data-state="{{ state }}" aria-label="{{ label }}">
+    {{ icon("mic", size=64, fill=True) }}
+  </button>
+{%- endmacro %}
+
+{# ---------- Progress pipe ------------------------------------ #}
+{% macro progress(percent) -%}
+  <div class="progress" role="progressbar" aria-valuenow="{{ percent }}" aria-valuemin="0" aria-valuemax="100">
+    <div class="progress__fill" style="width: {{ percent }}%"></div>
+  </div>
+{%- endmacro %}
+
+{# ---------- Status chip (Recording... Thinking...) ----------- #}
+{% macro chip(label, live=False) -%}
+  <span class="chip">
+    <span class="chip__dot {{ 'chip__dot--live' if live else '' }}"></span>
+    <span>{{ label }}</span>
+  </span>
+{%- endmacro %}

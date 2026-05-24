@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "partials/_components.html" import button, card, pill, tutor_bubble %}
+{% from "partials/_icon.html" import icon %}
+
+{% block title %}Rumik — Pick a block{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--space-6); padding-bottom: var(--space-6);">
+
+  {# --- Top stats row (mobile + desktop) ---------------------- #}
+  <div class="row-between" style="margin-bottom: var(--space-6);">
+    <h1 class="t-display" style="color: var(--color-secondary); margin: 0;">Rumik</h1>
+    <div class="row">
+      {{ pill(stars, icon_name="star", icon_color="var(--color-primary-container)") }}
+      {{ pill(streak, icon_name="local_fire_department", icon_color="var(--color-block-flame)") }}
+    </div>
+  </div>
+
+  {# --- Tutor greeting --------------------------------------- #}
+  <div style="display: flex; justify-content: center; margin-bottom: var(--space-6);">
+    {{ tutor_bubble("Ready to learn some new math tricks? Pick a block!") }}
+  </div>
+
+  {# --- Lesson grid: 2 unlocked + 2 locked ------------------- #}
+  <div class="lesson-grid">
+    <button class="lesson-block" style="background: var(--color-block-coral);">
+      <span class="t-display">+</span>
+      <span class="lesson-block__chip">Addition</span>
+    </button>
+
+    <button class="lesson-block" style="background: var(--color-block-sky);">
+      <span class="t-display">−</span>
+      <span class="lesson-block__chip">Subtraction</span>
+    </button>
+
+    <div class="lesson-block lesson-block--locked">
+      {{ icon("lock", size=64, fill=True) }}
+      <span class="lesson-block__chip">Mixed</span>
+    </div>
+
+    <div class="lesson-block lesson-block--locked">
+      {{ icon("lock", size=64, fill=True) }}
+      <span class="lesson-block__chip">Advanced</span>
+    </div>
+  </div>
+
+  {# --- Giant CTA ------------------------------------------- #}
+  <div style="display: flex; justify-content: center; margin-top: var(--space-6);">
+    <a class="btn btn--giant" href="/practice">LET'S PLAY!</a>
+  </div>
+</div>
+
+{# Page-scoped layout for the lesson grid. Layout is screen-specific;
+   the block surface treatment uses tokens so it stays consistent. #}
+<style>
+  .lesson-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+    max-width: 64rem;
+    margin: 0 auto;
+  }
+  @media (min-width: 1024px) {
+    .lesson-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+  .lesson-block {
+    aspect-ratio: 1 / 1;
+    border: var(--border-chunk);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-pop-md);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: var(--space-2);
+    transition: transform var(--dur-fast) var(--ease-pop);
+  }
+  .lesson-block:hover { transform: translateY(-4px); }
+  .lesson-block:active { transform: translate(4px, 4px); box-shadow: var(--shadow-pop-sm); }
+  .lesson-block--locked {
+    background: var(--color-surface-variant, var(--color-surface-container-high));
+    color: var(--color-on-surface-variant);
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  .lesson-block__chip {
+    background: var(--color-surface-container-lowest);
+    padding: 4px 16px;
+    border: var(--border-thin);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-pop-sm);
+    font-family: var(--font-display);
+    font-size: var(--text-headline-md);
+    font-weight: 700;
+  }
+</style>
+{% endblock %}
